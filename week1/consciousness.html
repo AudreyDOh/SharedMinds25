@@ -162,7 +162,7 @@ function drawText() {
     textEl.opacity = Math.max(0, 1 - (textEl.age / 300)); // Fade out over 300 frames
     
     // Draw the character
-    ctx.fillStyle = `rgba(50, 50, 50, ${textEl.opacity})`; // Dark gray with opacity
+    ctx.fillStyle = `rgba(0, 0, 0, ${textEl.opacity})`; // Dark gray with opacity
     ctx.fillText(textEl.char, textEl.x, textEl.y);
     
     // Remove completely faded text
