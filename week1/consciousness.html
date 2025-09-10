@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,6 +52,24 @@ let direction = 1; // 1 = right, -1 = left
 let speed = 2; // default
 let isMoving = false; // NEW: track if source should be moving
 
+// Array to store text positions
+let textElements = [];
+
+document.getElementById("wordInput").addEventListener("input", e => {
+  const currentText = e.target.value;
+  if (currentText.length > 0) {
+    const lastChar = currentText[currentText.length - 1];
+    // Add new character at random position
+    textElements.push({
+      char: lastChar,
+      x: Math.random() * (canvas.width - 20) + 10,
+      y: Math.random() * (canvas.height - 20) + 10,
+      opacity: 1,
+      age: 0
+    });
+  }
+});
+
 document.getElementById("wordInput").addEventListener("keydown", e => {
   if (e.key === "Enter") {
     // Start movement only when user presses Enter
@@ -76,6 +93,8 @@ document.getElementById("wordInput").addEventListener("keydown", e => {
       sourceX = canvas.width / 2;
 
       e.target.value = "";
+      // Clear existing text when enter is pressed
+      textElements = [];
     }
   }
 });
@@ -129,6 +148,30 @@ function updateSource() {
   }
 }
 
+function drawText() {
+  // Set text properties
+  ctx.font = "14px Arial";
+  ctx.textAlign = "center";
+  
+  // Update and draw each text element
+  for (let i = textElements.length - 1; i >= 0; i--) {
+    const textEl = textElements[i];
+    
+    // Age the text and fade it out
+    textEl.age++;
+    textEl.opacity = Math.max(0, 1 - (textEl.age / 300)); // Fade out over 300 frames
+    
+    // Draw the character
+    ctx.fillStyle = `rgba(50, 50, 50, ${textEl.opacity})`; // Dark gray with opacity
+    ctx.fillText(textEl.char, textEl.x, textEl.y);
+    
+    // Remove completely faded text
+    if (textEl.opacity <= 0) {
+      textElements.splice(i, 1);
+    }
+  }
+}
+
 function draw() {
   ctx.fillStyle = "rgba(0, 0, 0, 0.01)"; 
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -141,6 +184,9 @@ function draw() {
       drawBeam(sourceX, sourceY, slit);
     }
   }
+
+  // Draw text elements
+  drawText();
 
   ctx.fillStyle = "white";
   for (let slit of slits) {
