@@ -5,3 +5,4 @@ Week 1 [Blog](https://skitter-brownie-1c8.notion.site/Week-1-Blog-26a50145f38480
 
 Week 2 [Blog](https://www.notion.so/Week-2-Blog-27150145f3848005a16cde35701149bd?v=ecb42502e36d438687bc8d6ebafaca14&source=copy_link), [Assignment](https://audreydoh.github.io/SharedMinds25/Week2/index.html)
 
+Week 3 [Assignment](https://audreydoh.github.io/SharedMinds25/Week3/index.html)
