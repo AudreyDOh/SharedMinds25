@@ -94,27 +94,40 @@ displaySuggestions(suggestions);
 
 function createMoodPrompt(text, mood) {
     const moodPrompts = {
-        quirky: `Finish this sentence in a quirky, whimsical, and playful way: "${text}"`,
-        machiavellian: `Finish this sentence in a strategic, cunning, and manipulative way: "${text}"`,
-        empathetic: `Finish this sentence in a compassionate, understanding, and emotionally supportive way: "${text}"`,
-        friendly: `Finish this sentence in a warm, welcoming, and genuinely friendly way: "${text}"`,
-        righteous: `Finish this sentence in a bold, principled, and morally strong way: "${text}"`,
-        vindictive: `Finish this sentence in a sharp, cutting, and retaliatory way: "${text}"`
+        quirky: `Given the text: "${text}", provide three distinct, single words that could naturally and grammatically come next to complete the sentence in a quirky, playful way. Only output the words, separated by commas, with no numbers, punctuation, or extra commentary. Do not repeat any words from the user's input.`,
+        
+        machiavellian: `Given the text: "${text}", provide three distinct, single words that could naturally and grammatically come next to complete the sentence in a cunning, manipulative way. Only output the words, separated by commas, with no numbers, punctuation, or extra commentary. Do not repeat any words from the user's input.`,
+        
+        empathetic: `Given the text: "${text}", provide three distinct, single words that could naturally and grammatically come next to complete the sentence in a compassionate, understanding way. Only output the words, separated by commas, with no numbers, punctuation, or extra commentary. Do not repeat any words from the user's input.`,
+        
+        friendly: `Given the text: "${text}", provide three distinct, single words that could naturally and grammatically come next to complete the sentence in a warm, friendly way. Only output the words, separated by commas, with no numbers, punctuation, or extra commentary. Do not repeat any words from the user's input.`,
+        
+        righteous: `Given the text: "${text}", provide three distinct, single words that could naturally and grammatically come next to complete the sentence in a bold, morally strong way. Only output the words, separated by commas, with no numbers, punctuation, or extra commentary. Do not repeat any words from the user's input.`,
+        
+        vindictive: `Given the text: "${text}", provide three distinct, single words that could naturally and grammatically come next to complete the sentence in a sharp, cutting way. Only output the words, separated by commas, with no numbers, punctuation, or extra commentary. Do not repeat any words from the user's input.`
     };
-    
+
     return moodPrompts[mood];
 }
 
 
+
 function parseSuggestions(response) {
-    const cleaned = response.replace(/[^\w\s,]/g, '').trim();
-    const words = cleaned.split(/[\n\s,]+/).filter(word => 
-        word.length > 0 && 
-        word.length < 20 && 
-        /^[a-zA-Z]+$/.test(word)
-    );
-    return [...new Set(words)].slice(0, 3);
+    // Split by commas, trim whitespace
+    const rawWords = response.split(',').map(w => w.trim()).filter(w => w.length > 0);
+
+    // Merge any accidental splits 
+    const words = rawWords.map(word => word.replace(/\s+/g, ''));
+
+    // Exclude already typed words
+    const inputWords = textInput.value.toLowerCase().split(/\s+/);
+    const nextWords = words.filter(word => !inputWords.includes(word.toLowerCase()));
+
+    return nextWords.slice(0, 3); // return up to 3 suggestions
 }
+
+
+
 
 function displaySuggestions(suggestions) {
     if (suggestions.length === 0) {
