@@ -1,3 +1,4 @@
+
 let currentMood = '';
 let debounceTimeout;
 
@@ -53,11 +54,14 @@ async function getSuggestions() {
         
         console.log('Making API request...', { prompt });
         
+        const authToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjA1NTc3MjZmYWIxMjMxZmEyZGNjNTcyMWExMDgzZGE2ODBjNGE3M2YiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiQXVkcmV5IE9oIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0xvdEVlUWNJZWNfUndLQ3I4b2tiT0hoel9ERWMwcjZsVWZITHZJZlJKdGt6R3I9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vaXRwLWltYS1yZXBsaWNhdGUtcHJveHkiLCJhdWQiOiJpdHAtaW1hLXJlcGxpY2F0ZS1wcm94eSIsImF1dGhfdGltZSI6MTc1ODUxNTUzNCwidXNlcl9pZCI6Im1DRXhacVlYTFFZZHZianFwTWxCeUtYNmo5WjIiLCJzdWIiOiJtQ0V4WnFZWExRWWR2YmpxcE1sQnlLWDZqOVoyIiwiaWF0IjoxNzU4NTE1NTM0LCJleHAiOjE3NTg1MTkxMzQsImVtYWlsIjoiZG83NzJAbnl1LmVkdSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7Imdvb2dsZS5jb20iOlsiMTExNzk1Njc2Njc5MDMxNTIyNTY3Il0sImVtYWlsIjpbImRvNzcyQG55dS5lZHUiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.NupY-U7b6BUnyeP3P6UT67AdEDcsoURbft8gvmgJQ7Y6SSsRja6Cxbf2yM6jZrNJ-HVbft-t5JckcaDigQyb4Ug6HUQAoDMYqj5pYofLYXXEohIVpB_CVmQ3JKwUgtCYWK-BTv1IRjIz3zMLLa6jsfmXYfo0j0aU0kShKS5fQd1PMM4m1AxMN6KimzR63vWcMkfIgivgBExP7KTmkoS05RdvuxdrMicHfDtVHTfF8qS5oU5IWET4awGwr14gVjnduU3H3u0Eie_EMLPzV-VcS4FA0aMk_6VP-15OwXc6NxIcNbPxeeGflSHukoAtsokY4eGTSEf0MoogG5PB66UE1A";
+
         const response = await fetch('https://itp-ima-replicate-proxy.web.app/api/create_n_get', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
                 model: 'gpt-4',
@@ -130,12 +134,12 @@ function displayMockSuggestions() {
 
 function createMoodPrompt(text, mood) {
     const moodPrompts = {
-        quirky: `Given this text: "${text}", suggest 3 quirky, whimsical, and unexpectedly playful next words that would add humor and surprise. Think outside the box!`,
-        machiavellian: `Given this text: "${text}", suggest 3 strategic, cunning, and subtly manipulative next words that would maximize influence and control.`,
-        empathetic: `Given this text: "${text}", suggest 3 compassionate, understanding, and emotionally supportive next words that show deep care and connection.`,
-        friendly: `Given this text: "${text}", suggest 3 warm, welcoming, and genuinely friendly next words that would make someone feel comfortable and liked.`,
-        righteous: `Given this text: "${text}", suggest 3 bold, principled, and morally strong next words that stand for justice and truth.`,
-        vindictive: `Given this text: "${text}", suggest 3 sharp, cutting, and retaliatory next words that have an edge and show displeasure.`
+        quirky: `Given this text: \"${text}\", suggest 3 quirky, whimsical, and unexpectedly playful next words that would add humor and surprise. Think outside the box!`,
+        machiavellian: `Given this text: \"${text}\", suggest 3 strategic, cunning, and subtly manipulative next words that would maximize influence and control.`,
+        empathetic: `Given this text: \"${text}\", suggest 3 compassionate, understanding, and emotionally supportive next words that show deep care and connection.`,
+        friendly: `Given this text: \"${text}\", suggest 3 warm, welcoming, and genuinely friendly next words that would make someone feel comfortable and liked.`,
+        righteous: `Given this text: \"${text}\", suggest 3 bold, principled, and morally strong next words that stand for justice and truth.`,
+        vindictive: `Given this text: \"${text}\", suggest 3 sharp, cutting, and retaliatory next words that have an edge and show displeasure.`
     };
     
     return moodPrompts[mood] + " Respond with only the 3 words separated by commas, nothing else.";
