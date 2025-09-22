@@ -94,16 +94,17 @@ displaySuggestions(suggestions);
 
 function createMoodPrompt(text, mood) {
     const moodPrompts = {
-        quirky: `Return only a comma-separated list of three quirky, whimsical, and playful words to add to the following text: "${text}"`,
-        machiavellian: `Return only a comma-separated list of three strategic, cunning, and manipulative words to add to the following text: "${text}"`,
-        empathetic: `Return only a comma-separated list of three compassionate, understanding, and emotionally supportive words to add to the following text: "${text}"`,
-        friendly: `Return only a comma-separated list of three warm, welcoming, and genuinely friendly words to add to the following text: "${text}"`,
-        righteous: `Return only a comma-separated list of three bold, principled, and morally strong words to add to the following text: "${text}"`,
-        vindictive: `Return only a comma-separated list of three sharp, cutting, and retaliatory words to add to the following text: "${text}"`
+        quirky: `Finish this sentence in a quirky, whimsical, and playful way: "${text}"`,
+        machiavellian: `Finish this sentence in a strategic, cunning, and manipulative way: "${text}"`,
+        empathetic: `Finish this sentence in a compassionate, understanding, and emotionally supportive way: "${text}"`,
+        friendly: `Finish this sentence in a warm, welcoming, and genuinely friendly way: "${text}"`,
+        righteous: `Finish this sentence in a bold, principled, and morally strong way: "${text}"`,
+        vindictive: `Finish this sentence in a sharp, cutting, and retaliatory way: "${text}"`
     };
     
     return moodPrompts[mood];
 }
+
 
 function parseSuggestions(response) {
     const cleaned = response.replace(/[^\w\s,]/g, '').trim();
