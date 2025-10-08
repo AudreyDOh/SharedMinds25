@@ -242,9 +242,16 @@ function computeAxisProjections() {
   const domainSet = entities.map(e => e.domainEmbedding);
   const concatSet = getBlendedEmbeddings();
 
-  // Helper to get 1D UMAP ordering/coordinate
+  // Helper to get 1D UMAP ordering/coordinate with fixed random seed for consistency
   const oneD = (vectors) => {
-    const u = new UMAP({ n_neighbors: Math.min(15, entities.length - 1), n_components: 1, min_dist: 0.35, n_epochs: 250, metric: 'cosine' });
+    const u = new UMAP({ 
+      n_neighbors: Math.min(15, entities.length - 1), 
+      n_components: 1, 
+      min_dist: 0.35, 
+      n_epochs: 250, 
+      metric: 'cosine',
+      random: () => 0.42 // Fixed seed for deterministic results!
+    });
     u.fit(vectors);
     const emb = u.getEmbedding(); // shape N x 1
     return emb.map(row => row[0]);
