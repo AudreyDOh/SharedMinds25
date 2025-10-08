@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read and write to the wishes collection for everyone
+    // For production, you should add authentication!
+    match /wishes/{wishId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
+

@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "wishes": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
+
