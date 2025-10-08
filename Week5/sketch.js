@@ -869,9 +869,8 @@ function showMatchExplanation(wishText, entity, match, weights) {
   const conf = Math.round(Math.max(0, Math.min(1, (match.score + 1) / 2)) * 100);
   explainEl.innerHTML = `
     <div style="font-weight:700; margin-bottom:6px;">Why ${entity.name}?</div>
-    <div style="opacity:0.9;">Matched by weighted similarity:</div>
+    <div style="opacity:0.9;">Matched by equal weighting:</div>
     <ul style="margin:6px 0 8px 16px; padding:0;">
-      <li>Personality × ${weights.personality.toFixed(1)}</li>
       <li>Power × ${weights.power.toFixed(1)}</li>
       <li>Domain × ${weights.domain.toFixed(1)}</li>
     </ul>
