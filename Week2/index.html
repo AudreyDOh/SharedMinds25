@@ -1,58 +1,65 @@
 <!DOCTYPE html>
-
-<input id="prompt" placeholder="Enter your prompt" />
-<button onclick="askForPicture()">Generate</button>
-<div id="output"></div>
-
-<script>
-async function askForPicture() {
-  let replicateProxy = "https://itp-ima-replicate-proxy.web.app/api/create_n_get";
-  const basePrompt = document.getElementById("prompt").value;
-  const modifiedPrompt = `${basePrompt} in Gaza, 2025`;
-
-  let data = {
-    model: "black-forest-labs/flux-schnell",
-    input: { prompt: modifiedPrompt },
-  };
-
-  let fetchOptions = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  };
-
-  console.log("sending to replicate:", data);
-
-  try {
-    const response = await fetch(replicateProxy, fetchOptions);
-    const prediction = await response.json();
-    console.log("Got back:", prediction);  // 🔍 Look here in DevTools console
-
-    let imgUrl = null;
-
-    // Case B: response has output property
-    if (prediction.output && prediction.output.length > 0) {
-      imgUrl = prediction.output[0];
-    }
-    // Case A: response itself is just an array
-    else if (Array.isArray(prediction) && prediction.length > 0) {
-      imgUrl = prediction[0];
-    }
-    // Case C: error field
-    else if (prediction.error) {
-      document.getElementById("output").innerText = "Error: " + prediction.error;
-      return;
-    }
-
-    if (imgUrl) {
-      document.getElementById("output").innerHTML =
-        `<img src="${imgUrl}" width="512">`;
-    } else {
-      document.getElementById("output").innerText = "No image generated.";
-    }
-  } catch (err) {
-    console.error("Fetch failed:", err);
-    document.getElementById("output").innerText = "Fetch error: " + err.message;
-  }
-}
-</script>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Generator - Week 2</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #output {
+            margin-top: 20px;
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Generator</h1>
+        <p>Enter a prompt to generate an image:</p>
+        
+        <input id="prompt" placeholder="Enter your prompt" />
+        <button onclick="askForPicture()">Generate</button>
+        <div id="output"></div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
