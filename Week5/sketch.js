@@ -12,7 +12,7 @@ const firebaseConfig = {
   messagingSenderId: "747240210613",
   appId: "1:747240210613:web:7a7d0b22e30d65148dbefc",
   measurementId: "G-07HRBV3H36",
-  databaseURL: "https://audreysharedminds25-default-rtdb.firebaseio.com" // Realtime Database URL
+  databaseURL: "https://audreysharedminds25-default-rtdb.firebaseio.com" // REQUIRED for Realtime Database!
 };
 
 firebase.initializeApp(firebaseConfig);
