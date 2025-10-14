@@ -21,16 +21,6 @@
       <label for="powerWeight">Power vs Domain</label>
       <input type="range" id="powerWeight" name="powerWeight" min="0" max="1" value="0.3" step="0.05">
       <span id="powerWeightValue">power 0.30 / domain 0.70</span>
-      <br>
-      <label for="timeline">Timeline</label>
-      <input type="range" id="timeline" min="0" max="100" value="100" step="1" style="width:240px;">
-      <span id="timelineValue">Live</span>
-      <button id="playback">Replay</button>
-      <br>
-      <label style="user-select:none;">
-        <input type="checkbox" id="pinExplain">
-        Pin "Why this deity?" card
-      </label>
     </div>
     <div id="canvas-container" style="position: relative; width: 100%; height: 620px;"></div>
     <div id="tooltip" style="position:absolute; pointer-events:none; display:none; background: rgba(10,10,20,0.9); color:#fff; border:1px solid rgba(150,150,200,0.5); padding:8px; border-radius:6px; max-width:260px; font-size:12px;"></div>
@@ -41,6 +31,14 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="expandedEntities.js"></script>
   <script type="module" src="sketch.js"></script>
+  
+  <!-- Fallback for debugging -->
+  <script>
+    window.addEventListener('load', () => {
+      console.log('Page loaded. Firebase available:', typeof firebase !== 'undefined');
+      console.log('Submit button:', document.getElementById('submitWish'));
+    });
+  </script>
 </body>
 
 </html>

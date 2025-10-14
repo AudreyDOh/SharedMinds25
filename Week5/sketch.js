@@ -15,8 +15,14 @@ const firebaseConfig = {
   databaseURL: "https://audreysharedminds25-default-rtdb.firebaseio.com" // REQUIRED for Realtime Database!
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+// Initialize Firebase when it's ready
+let db;
+if (typeof firebase !== 'undefined') {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+} else {
+  console.error('Firebase not loaded yet');
+}
 
 // ----- Global State -----
 let entities = [];
@@ -38,9 +44,6 @@ let deityIndexToHalo = new Map();
 let deityCounts = new Map();
 let activeBeamAnimations = new Set();
 let ritualRings = [];
-let playbackMode = false;
-let timelinePercent = 100; // 0..100
-let pinnedExplain = false;
 let matchPulse = null;
 let typingLastTs = 0;
 let typingHalo = null;
@@ -53,7 +56,29 @@ window.addEventListener('DOMContentLoaded', () => {
   explainEl = document.getElementById('explain-card');
   // Disable submit until ready
   const submitBtn = document.getElementById('submitWish');
-  if (submitBtn) submitBtn.disabled = true;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Loading...';
+    submitBtn.style.opacity = '0.5';
+  }
+  
+  // Check if Firebase is available
+  if (typeof firebase === 'undefined') {
+    console.error('Firebase not loaded. Please check script loading order.');
+    return;
+  }
+  
+  // Initialize Firebase if not already done
+  if (!db) {
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      console.log('Firebase initialized successfully');
+    } catch (error) {
+      console.error('Firebase initialization failed:', error);
+      return;
+    }
+  }
   
   initializeEntities();
   assignDomainColors();
@@ -64,7 +89,14 @@ window.addEventListener('DOMContentLoaded', () => {
     wireUI();
     subscribeBeams();
     // Enable submit now that everything is ready
-    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit';
+      submitBtn.style.opacity = '1';
+    }
+    console.log('Application ready - submit button enabled');
+  }).catch(error => {
+    console.error('Failed to initialize application:', error);
   });
 });
 
@@ -82,27 +114,6 @@ function wireUI() {
       e.preventDefault();
       onSubmitWish();
     }
-  });
-  const timeline = document.getElementById('timeline');
-  const timelineValue = document.getElementById('timelineValue');
-  const playbackBtn = document.getElementById('playback');
-  const pinExplain = document.getElementById('pinExplain');
-  timeline.addEventListener('input', () => {
-    timelinePercent = parseInt(timeline.value, 10);
-    if (timelinePercent === 100) {
-      playbackMode = false;
-      timelineValue.textContent = 'Live';
-    } else {
-      playbackMode = true;
-      const cut = computeCutoffTime();
-      timelineValue.textContent = new Date(cut).toLocaleTimeString();
-    }
-    updateVisibilityForTimeline();
-  });
-  playbackBtn.addEventListener('click', () => startReplay());
-  pinExplain.addEventListener('change', () => {
-    pinnedExplain = pinExplain.checked;
-    if (!pinnedExplain && explainEl) explainEl.style.display = 'none';
   });
 
   // typing listeners for wish input
@@ -185,20 +196,65 @@ function assignDomainColors() {
     });
 }
 
+// Helper function to clear old embedding cache if storage is full
+function clearEmbeddingCache() {
+  try {
+    const keys = Object.keys(localStorage);
+    const embeddingKeys = keys.filter(key => key.startsWith('embedding_'));
+    embeddingKeys.forEach(key => localStorage.removeItem(key));
+    console.log('Cleared', embeddingKeys.length, 'cached embeddings');
+  } catch (error) {
+    console.warn('Failed to clear embedding cache:', error.message);
+  }
+}
+
 async function fetchAllEmbeddings() {
   console.log('Generating embeddings for all entities...');
   for (let entity of entities) {
     const cacheKey = `embedding_${entity.name}`;
-    let cachedEmbeddings = localStorage.getItem(cacheKey);
+    let cachedEmbeddings = null;
+    
+    // Try to get cached embeddings, but don't fail if localStorage is unavailable
+    try {
+      cachedEmbeddings = localStorage.getItem(cacheKey);
+    } catch (error) {
+      console.warn('localStorage unavailable, generating embeddings without cache:', error.message);
+    }
+    
     if (cachedEmbeddings) {
-      const embeddings = JSON.parse(cachedEmbeddings);
-      [entity.personalityEmbedding, entity.powerEmbedding, entity.domainEmbedding] = embeddings;
-    } else {
+      try {
+        const embeddings = JSON.parse(cachedEmbeddings);
+        [entity.personalityEmbedding, entity.powerEmbedding, entity.domainEmbedding] = embeddings;
+      } catch (error) {
+        console.warn('Failed to parse cached embeddings for', entity.name, ':', error.message);
+        cachedEmbeddings = null; // Force regeneration
+      }
+    }
+    
+    if (!cachedEmbeddings) {
       entity.personalityEmbedding = generateDeterministicEmbedding(entity.name + entity.personality);
       entity.powerEmbedding = generateDeterministicEmbedding(entity.name + entity.power);
       entity.domainEmbedding = generateDeterministicEmbedding(entity.name + entity.domain);
-      const embeddings = [entity.personalityEmbedding, entity.powerEmbedding, entity.domainEmbedding];
-      localStorage.setItem(cacheKey, JSON.stringify(embeddings));
+      
+      // Try to cache embeddings, but don't fail if storage is full
+      try {
+        const embeddings = [entity.personalityEmbedding, entity.powerEmbedding, entity.domainEmbedding];
+        localStorage.setItem(cacheKey, JSON.stringify(embeddings));
+      } catch (error) {
+        console.warn('Failed to cache embeddings for', entity.name, ':', error.message);
+        // If quota exceeded, clear old cache and try once more
+        if (error.name === 'QuotaExceededError') {
+          console.log('Storage quota exceeded, clearing old cache...');
+          clearEmbeddingCache();
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(embeddings));
+            console.log('Successfully cached after clearing old data');
+          } catch (retryError) {
+            console.warn('Still unable to cache after clearing:', retryError.message);
+          }
+        }
+        // Continue without caching - the app will still work
+      }
     }
   }
   console.log('All embeddings generated!');
@@ -242,15 +298,14 @@ function computeAxisProjections() {
   const domainSet = entities.map(e => e.domainEmbedding);
   const concatSet = getBlendedEmbeddings();
 
-  // Helper to get 1D UMAP ordering/coordinate with fixed random seed for consistency
+  // Helper to get 1D UMAP ordering/coordinate
   const oneD = (vectors) => {
     const u = new UMAP({ 
       n_neighbors: Math.min(15, entities.length - 1), 
       n_components: 1, 
       min_dist: 0.35, 
       n_epochs: 250, 
-      metric: 'cosine',
-      random: () => 0.42 // Fixed seed for deterministic results!
+      metric: 'cosine'
     });
     u.fit(vectors);
     const emb = u.getEmbedding(); // shape N x 1
@@ -505,13 +560,28 @@ function hideTooltip() {
 
 // ----- Wish Submission and Matching -----
 function onSubmitWish() {
+  console.log('Submit button clicked');
+  
   if (!embeddingsReady || deityMeshes.length === 0) {
     console.warn('Still preparing the cosmos. Please wait a moment.');
+    alert('Still preparing the cosmos. Please wait a moment.');
     return;
   }
+  
+  if (!db) {
+    console.error('Database not initialized');
+    alert('Database connection not ready. Please refresh the page.');
+    return;
+  }
+  
   const input = document.getElementById('wishText');
   const text = (input.value || '').trim();
-  if (!text) return;
+  if (!text) {
+    console.log('No text entered');
+    return;
+  }
+  
+  console.log('Processing wish:', text);
 
   // Build concatenated wish embedding to match concatenated entity embeddings
   // Fixed 50/50 split between power and domain
@@ -824,50 +894,6 @@ function updateDeityHalo(idx) {
   halo.material.opacity = 0.25 + Math.min(0.5, Math.log(1 + count) * 0.15);
 }
 
-// ----- Timeline scrubber -----
-function computeCutoffTime() {
-  // Map 0..100 to oldest..now across observed wishes
-  let oldest = Infinity, newest = 0;
-  wishDocIdToBeam.forEach(beam => {
-    oldest = Math.min(oldest, beam.createdAtMs || Date.now());
-    newest = Math.max(newest, beam.createdAtMs || Date.now());
-  });
-  if (!isFinite(oldest) || newest <= oldest) return Date.now();
-  const t = timelinePercent / 100;
-  return oldest + (newest - oldest) * t;
-}
-
-function updateVisibilityForTimeline() {
-  if (!playbackMode) {
-    // live: show all, natural fading
-    wishDocIdToBeam.forEach(beam => {
-      if (beam.object3d) beam.object3d.visible = true;
-    });
-    return;
-  }
-  const cut = computeCutoffTime();
-  wishDocIdToBeam.forEach(beam => {
-    if (!beam.object3d) return;
-    beam.object3d.visible = (beam.createdAtMs || 0) <= cut;
-  });
-}
-
-function startReplay() {
-  // include live beams created locally but not yet in Firestore by duplicating wishDocIdToBeam
-  if (wishDocIdToBeam.size === 0 && activeBeamAnimations.size === 0) return;
-  playbackMode = true;
-  const localBeams = Array.from(activeBeamAnimations).map(b => ({ ...b }));
-  const all = [...Array.from(wishDocIdToBeam.values()), ...localBeams].sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
-  all.forEach(b => { if (b.object3d) { b.object3d.visible = false; }});
-  let i = 0;
-  const step = () => {
-    if (i >= all.length) { playbackMode = false; return; }
-    const b = all[i++];
-    if (b.object3d) { b.object3d.visible = true; }
-    setTimeout(step, 240);
-  };
-  step();
-}
 
 // ----- Explain match -----
 function showMatchExplanation(wishText, entity, match, weights) {
@@ -888,10 +914,8 @@ function showMatchExplanation(wishText, entity, match, weights) {
   explainEl.style.left = (screen.x + 16) + 'px';
   explainEl.style.top = (screen.y - 10) + 'px';
   explainEl.style.display = 'block';
-  if (!pinnedExplain) {
-    clearTimeout(showMatchExplanation._t);
-    showMatchExplanation._t = setTimeout(() => { explainEl.style.display = 'none'; }, 5000);
-  }
+  clearTimeout(showMatchExplanation._t);
+  showMatchExplanation._t = setTimeout(() => { explainEl.style.display = 'none'; }, 5000);
 }
 
 function worldToScreen(pos) {
