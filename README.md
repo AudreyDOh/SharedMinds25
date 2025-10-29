@@ -15,4 +15,4 @@ Week 6 [Blog](https://skitter-brownie-1c8.notion.site/Week-6-Blog-28c50145f38480
 
 Week 7 [Blog + Assignment](https://skitter-brownie-1c8.notion.site/Week-7-Blog-28d50145f3848032a334f81a849a7c19?source=copy_link)
 
-Week 8 [Blog], [Assignment]
+Week 8 [Blog](https://skitter-brownie-1c8.notion.site/Week-9-Blog-29b50145f384809b8e7bf0aae7adb299?source=copy_link), [Assignment](https://audreydoh.github.io/SharedMinds25/Week8/)
