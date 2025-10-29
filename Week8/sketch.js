@@ -117,8 +117,8 @@ submitButton.addEventListener('click', async () => {
       uid: user.uid,
       displayName: user.displayName || null,
       createdAt: serverTimestamp(),
-      // initial position near origin with small jitter; physics will evolve it
-      pos: { x: (Math.random()-0.5)*40, y: (Math.random()-0.5)*40, z: (Math.random()-0.5)*40 }
+      // initial position: random in expanded bounds (disk), mild random Z
+      pos: randomSpawnPosObj()
     });
     thoughtInput.value = '';
   } catch (e) {
@@ -149,6 +149,7 @@ let manualThoughtCount = 0;
 let derivedThoughtCount = 0;
 const existingDerivedPairs = new Set(); // normalized pair keys already materialized as derived thoughts
 const MAX_THOUGHTS_RENDER = 60; // show only the most recent N
+const BOUNDS_SCALE = 1.8; // expand world bounds beyond visible frame
 
 initThree();
 subscribeThoughts();
@@ -282,22 +283,20 @@ function createGooMaterial(color = 0x88aaff) {
 
 function addBlob(id, data) {
   if (blobs.has(id)) return;
-  const radius = 12 + Math.min(24, (data.text?.length || 0) * 0.35);
+  const radius = (12 + Math.min(24, (data.text?.length || 0) * 0.35)) * 0.875; // size down by ~1/8
   const geo = new THREE.IcosahedronGeometry(radius, 3);
   const material = createGooMaterial(0xffea00);
   const mesh = new THREE.Mesh(geo, material);
   if (data.pos && (data.pos.x != null)) {
     mesh.position.set(data.pos.x, data.pos.y || 0, data.pos.z || 0);
   } else {
-    // Spawn more spread-out on a large ring with spacing from existing blobs
-    const maxR = Math.min(viewBounds.halfW, viewBounds.halfH);
-    const rMin = maxR * 0.80;
-    const rMax = maxR * 0.98;
-    const minSpacing = 90; // pixels in world units
+    // Spawn randomly in a disk (non-grid), with spacing from existing blobs
+    const maxR = Math.min(viewBounds.halfW, viewBounds.halfH) * 0.95;
+    const minSpacing = 90;
     let placed = false;
-    for (let tries = 0; tries < 24 && !placed; tries++) {
+    for (let tries = 0; tries < 32 && !placed; tries++) {
       const angle = Math.random() * Math.PI * 2;
-      const r = rMin + Math.random() * (rMax - rMin);
+      const r = Math.sqrt(Math.random()) * maxR; // uniform in disk
       const candidate = new THREE.Vector3(Math.cos(angle) * r, Math.sin(angle) * r, (Math.random()-0.5) * 18);
       let ok = true;
       for (const b of blobs.values()) {
@@ -306,8 +305,7 @@ function addBlob(id, data) {
       if (ok) { mesh.position.copy(candidate); placed = true; }
     }
     if (!placed) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = (rMin + rMax) * 0.5;
+      const angle = Math.random() * Math.PI * 2; const r = maxR * 0.8;
       mesh.position.set(Math.cos(angle)*r, Math.sin(angle)*r, 0);
     }
   }
@@ -404,6 +402,19 @@ function stepPhysics(dt) {
       const desiredSpeed = 20 + 60 * proximity; // 20..80
       const desiredVel = dirToCursor.clone().multiplyScalar(desiredSpeed);
       a.velocity.add(desiredVel.sub(a.velocity).multiplyScalar((0.35 + 0.25*proximity) * dt));
+    }
+
+    // very slow radial drift away from center (keeps the field breathing outward)
+    const pos = a.mesh.position;
+    const rLen = pos.length();
+    if (rLen > 0.001) {
+      const outDir = pos.clone().multiplyScalar(1 / rLen);
+      const baseDrift = 1; // very subtle
+      a.velocity.addScaledVector(outDir, baseDrift * dt);
+      // tiny wobble so paths aren't perfectly straight
+      const tNow = performance.now() * 0.0002 + a.mesh.id * 0.013;
+      a.velocity.x += Math.sin(tNow) * 0.02 * dt;
+      a.velocity.y += Math.cos(tNow * 1.3) * 0.02 * dt;
     }
     // No global pairwise attraction (keeps past balls static/spread)
     for (let j = i + 1; j < arr.length; j++) {
@@ -908,7 +919,7 @@ function computeViewBounds() {
   const vFOV = THREE.MathUtils.degToRad(camera.fov);
   const halfH = Math.tan(vFOV/2) * dist;
   const halfW = halfH * camera.aspect;
-  viewBounds = { halfW, halfH };
+  viewBounds = { halfW: halfW * BOUNDS_SCALE, halfH: halfH * BOUNDS_SCALE };
 }
 
 function applyBounds(blob) {
@@ -919,8 +930,19 @@ function applyBounds(blob) {
   if (p.y > viewBounds.halfH - blob.radius) { p.y = viewBounds.halfH - blob.radius; blob.velocity.y *= -e; }
   if (p.y < -viewBounds.halfH + blob.radius) { p.y = -viewBounds.halfH + blob.radius; blob.velocity.y *= -e; }
   // optional shallow z constraint
-  if (p.z > 40) { p.z = 40; blob.velocity.z *= -e; }
-  if (p.z < -40) { p.z = -40; blob.velocity.z *= -e; }
+  if (p.z > 120) { p.z = 120; blob.velocity.z *= -e; }
+  if (p.z < -120) { p.z = -120; blob.velocity.z *= -e; }
+}
+
+function randomSpawnPosObj() {
+  // uniform in disk within expanded bounds, plus shallow Z range
+  const maxR = Math.min(viewBounds.halfW, viewBounds.halfH) * 0.9;
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(Math.random()) * maxR;
+  const x = Math.cos(angle) * r;
+  const y = Math.sin(angle) * r;
+  const z = (Math.random() - 0.5) * 160;
+  return { x, y, z };
 }
 
 function updateLabels() {
