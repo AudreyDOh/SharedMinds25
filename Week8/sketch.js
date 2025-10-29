@@ -328,6 +328,9 @@ function addBlob(id, data) {
     radius,
     isDerived: !!(data.derivedFrom)
   });
+
+  // Enforce local cap to keep at most the most recent MAX_THOUGHTS_RENDER
+  enforceBubbleCap();
 }
 
 function updateBlob(id, data) {
@@ -347,6 +350,13 @@ function removeBlob(id) {
   b.material?.dispose();
   b.labelEl?.remove();
   blobs.delete(id);
+}
+
+function enforceBubbleCap() {
+  while (blobs.size > MAX_THOUGHTS_RENDER) {
+    const oldestId = blobs.keys().next().value;
+    removeBlob(oldestId);
+  }
 }
 
 // ----- Physics: cursor magnetism and blob merging -----
@@ -439,8 +449,7 @@ function maybeStartMerge(a, b) {
   if (last && now - last < 2500) return; // skip if recently merged
   // Relaxed constraints: allow merges regardless of origin (manual/derived)
   // Keep dedupe per pair and cooldowns to prevent explosions
-  // Prevent duplicates if a derived for this pair already exists
-  if (existingDerivedPairs.has(makePairKey(String(ida), String(idb)))) return;
+  // Allow multiple derived thoughts per pair (no dedupe here)
   const receiver = (a.radius >= b.radius) ? a : b;
   const donor = (receiver === a) ? b : a;
   const combinedVolume = Math.pow(receiver.radius,3) + Math.pow(donor.radius,3);
@@ -592,18 +601,16 @@ function updateMerges(dt) {
           const aId = receiver.id || null;
           const bId = donor.id || null;
           const dKey = makePairKey(String(aId || ''), String(bId || ''));
-          if (!existingDerivedPairs.has(dKey) && (derivedThoughtCount < Math.floor(manualThoughtCount / 2))) {
-            existingDerivedPairs.add(dKey);
-            derivedThoughtCount++;
-            set(newRef, {
-              text: newText,
-              uid: u?.uid || null,
-              displayName: u?.displayName || null,
-              createdAt: serverTimestamp(),
-              pos: { x: mid.x, y: mid.y, z: mid.z },
-              derivedFrom: { a: aId, b: bId }
-            }).catch(()=>{});
-          }
+          existingDerivedPairs.add(dKey);
+          derivedThoughtCount++;
+          set(newRef, {
+            text: newText,
+            uid: u?.uid || null,
+            displayName: u?.displayName || null,
+            createdAt: serverTimestamp(),
+            pos: { x: mid.x, y: mid.y, z: mid.z },
+            derivedFrom: { a: aId, b: bId }
+          }).catch(()=>{});
         }).catch(()=>{});
         // set cooldowns and remember the pair
         const ida = receiver.id || receiver.mesh.id;
