@@ -245,15 +245,13 @@ function subscribeThoughts() {
   const thoughtsRef = dbRef(rtdb, 'thoughts');
   const q = query(thoughtsRef, orderByChild('createdAt'), limitToLast(MAX_THOUGHTS_RENDER));
   onChildAdded(q, (snap) => {
-    addBlob(snap.key, snap.val());
     const data = snap.val() || {};
+    // Skip rendering any previously saved derived thoughts; only show original inputs
     if (data.derivedFrom && (data.derivedFrom.a || data.derivedFrom.b)) {
-      const key = makePairKey(String(data.derivedFrom.a || ''), String(data.derivedFrom.b || ''));
-      if (key) existingDerivedPairs.add(key);
-      derivedThoughtCount++;
-    } else {
-      manualThoughtCount++;
+      return;
     }
+    addBlob(snap.key, data);
+    manualThoughtCount++;
   });
   onChildChanged(q, (snap) => {
     updateBlob(snap.key, snap.val());
@@ -381,7 +379,7 @@ function animate() {
 function stepPhysics(dt) {
   const kMagnet = 150; // strong magnet strength
   const magnetRadius = 110; // tighter influence
-  const drag = 0.92; // viscosity
+  const drag = 0.995; // light damping to keep motion continuous
   const mergeDistanceFactor = 1.05; // allow merge when blobs are very close (or slightly apart)
   const minSeparationPad = 12; // extra gap to avoid visual overlap
 
@@ -409,14 +407,14 @@ function stepPhysics(dt) {
     const rLen = pos.length();
     if (rLen > 0.001) {
       const outDir = pos.clone().multiplyScalar(1 / rLen);
-      const baseDrift = 1; // very subtle
+      const baseDrift = 0.6; // very subtle
       a.velocity.addScaledVector(outDir, baseDrift * dt);
       // tiny wobble so paths aren't perfectly straight
       const tNow = performance.now() * 0.0002 + a.mesh.id * 0.013;
       a.velocity.x += Math.sin(tNow) * 0.02 * dt;
       a.velocity.y += Math.cos(tNow * 1.3) * 0.02 * dt;
     }
-    // No global pairwise attraction (keeps past balls static/spread)
+    // Pairwise interactions
     for (let j = i + 1; j < arr.length; j++) {
       const b = arr[j];
       const delta = new THREE.Vector3().subVectors(b.mesh.position, a.mesh.position);
@@ -427,19 +425,32 @@ function stepPhysics(dt) {
       if (dist < mergeThreshold && (a.nearCursor || b.nearCursor)) {
         maybeStartMerge(a, b);
       }
-      // lightweight separation to prevent visual overlap/sticking when cursor is away
-      if (!(a.nearCursor || b.nearCursor)) {
+      // Elastic collision bounce when NOT under cursor attraction and not merging
+      if (!(a.nearCursor || b.nearCursor) && !(a.merging || b.merging)) {
         const targetDist = a.radius + b.radius + minSeparationPad;
         if (dist < targetDist) {
-          const dir = delta.divideScalar(dist);
-          const push = (targetDist - dist) * 0.35; // mild, stable correction
-          a.mesh.position.addScaledVector(dir.clone().multiplyScalar(-1), push * 0.5);
-          b.mesh.position.addScaledVector(dir, push * 0.5);
+          resolveElasticCollision(a, b, targetDist, 0.9);
         }
       }
     }
     // viscous drag
     a.velocity.multiplyScalar(drag);
+    // keep motion alive and bounded
+    const speed = a.velocity.length();
+    const minSpeed = 6;
+    const maxSpeed = 80;
+    if (speed < minSpeed) {
+      const factor = (speed > 1e-5) ? (minSpeed / speed) : 1;
+      a.velocity.multiplyScalar(factor);
+      if (speed <= 1e-5) {
+        // random nudge if nearly stopped
+        const ang = Math.random() * Math.PI * 2;
+        a.velocity.x += Math.cos(ang) * minSpeed * 0.5;
+        a.velocity.y += Math.sin(ang) * minSpeed * 0.5;
+      }
+    } else if (speed > maxSpeed) {
+      a.velocity.multiplyScalar(maxSpeed / speed);
+    }
     a.mesh.position.addScaledVector(a.velocity, dt);
     applyBounds(a);
     // subtle wobble to feel gooey
@@ -584,7 +595,7 @@ function updateMerges(dt) {
       bridge.children.forEach(child => { if (child.material) child.material.opacity = 0.85 * (1 - t); });
 
       if (t >= 1.0 || donor.radius < 0.05) {
-        // finalize merge: keep originals intact and create a new derived thought
+        // finalize merge: keep originals intact and create a new ephemeral derived thought (local only)
         scene.remove(bridge);
         bridge.children.forEach(child => { child.geometry?.dispose(); child.material?.dispose(); });
         // restore original sizes/positions
@@ -596,7 +607,6 @@ function updateMerges(dt) {
         donor.mesh.geometry = new THREE.IcosahedronGeometry(donor.radius, 3);
         receiver.mesh.position.copy(merge.startReceiverPos);
         donor.mesh.position.copy(merge.startDonorPos);
-        // compute midpoint and create a derived thought via proxy
         // midpoint with slight jitter to avoid stacking on originals
         const mid = p1.clone().add(p2).multiplyScalar(0.5);
         mid.x += (Math.random()-0.5) * 20;
@@ -606,22 +616,7 @@ function updateMerges(dt) {
         const donorText = donor.text;
         averageThoughtAsync(priorText, donorText).then(avg => {
           const newText = avg || sanitizeMidpoint(`${priorText} ${donorText}`);
-          const u = auth.currentUser;
-          const thoughtsRef = dbRef(rtdb, 'thoughts');
-          const newRef = push(thoughtsRef);
-          const aId = receiver.id || null;
-          const bId = donor.id || null;
-          const dKey = makePairKey(String(aId || ''), String(bId || ''));
-          existingDerivedPairs.add(dKey);
-          derivedThoughtCount++;
-          set(newRef, {
-            text: newText,
-            uid: u?.uid || null,
-            displayName: u?.displayName || null,
-            createdAt: serverTimestamp(),
-            pos: { x: mid.x, y: mid.y, z: mid.z },
-            derivedFrom: { a: aId, b: bId }
-          }).catch(()=>{});
+          addEphemeralBlob(newText, mid);
         }).catch(()=>{});
         // set cooldowns and remember the pair
         const ida = receiver.id || receiver.mesh.id;
@@ -932,6 +927,70 @@ function applyBounds(blob) {
   // optional shallow z constraint
   if (p.z > 120) { p.z = 120; blob.velocity.z *= -e; }
   if (p.z < -120) { p.z = -120; blob.velocity.z *= -e; }
+}
+
+// Resolve an elastic collision between two blobs in the XY plane, with position correction
+function resolveElasticCollision(a, b, targetDist, restitution = 0.9) {
+  const posA = a.mesh.position;
+  const posB = b.mesh.position;
+  const delta = new THREE.Vector3().subVectors(posB, posA);
+  const dist = Math.max(1e-6, Math.hypot(delta.x, delta.y));
+  const nx = delta.x / dist;
+  const ny = delta.y / dist;
+  // Positional correction to remove overlap
+  const overlap = targetDist - dist;
+  if (overlap > 0) {
+    const pushX = nx * (overlap * 0.5);
+    const pushY = ny * (overlap * 0.5);
+    posA.x -= pushX; posA.y -= pushY;
+    posB.x += pushX; posB.y += pushY;
+  }
+  // Mass proportional to radius^2 (2D area surrogate)
+  const mA = Math.max(1, a.radius * a.radius);
+  const mB = Math.max(1, b.radius * b.radius);
+  // Relative velocity along normal
+  const rvx = a.velocity.x - b.velocity.x;
+  const rvy = a.velocity.y - b.velocity.y;
+  const velAlongNormal = rvx * nx + rvy * ny;
+  if (velAlongNormal > 0) return; // already separating
+  const j = -(1 + restitution) * velAlongNormal / (1/mA + 1/mB);
+  const ix = j * nx;
+  const iy = j * ny;
+  a.velocity.x += ix / mA;
+  a.velocity.y += iy / mA;
+  b.velocity.x -= ix / mB;
+  b.velocity.y -= iy / mB;
+}
+
+// Create a local-only, ephemeral derived bubble that will vanish on refresh
+function addEphemeralBlob(text, positionVec3) {
+  const id = `local_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
+  const data = { text, pos: { x: positionVec3.x, y: positionVec3.y, z: positionVec3.z } };
+  if (blobs.has(id)) return;
+  const radius = (12 + Math.min(24, (text?.length || 0) * 0.35)) * 0.875;
+  const geo = new THREE.IcosahedronGeometry(radius, 3);
+  const material = createGooMaterial(0xffea00);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.copy(positionVec3);
+  metaballGroup.add(mesh);
+
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = text || '';
+  labelsLayer.appendChild(label);
+
+  blobs.set(id, {
+    id,
+    mesh,
+    material,
+    velocity: initialVelocity(),
+    text: text || '',
+    labelEl: label,
+    radius,
+    isDerived: true,
+    ephemeral: true
+  });
+  enforceBubbleCap();
 }
 
 function randomSpawnPosObj() {
