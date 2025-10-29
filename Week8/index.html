@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week 6 - Gooey Thoughts</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Three.js -->
+  <script type="module">
+    // Preload nothing; main.js will import modules
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Gooey Thoughts</h1>
+    <div class="auth">
+      <button id="googleSignIn">Sign in with Google</button>
+      <button id="signOut" style="display:none;">Sign out</button>
+      <span id="userInfo"></span>
+    </div>
+  </header>
+  <main>
+    <div class="input-row">
+      <input id="thoughtInput" type="text" placeholder="What are you thinking?" maxlength="140" />
+      <button id="submitThought">Push to existence</button>
+    </div>
+    <div id="three-container"></div>
+  </main>
+
+  <!-- Main entry -->
+  <script type="module" src="sketch.js"></script>
+</body>
+</html>
+
+
